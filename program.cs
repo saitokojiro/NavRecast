@@ -9,7 +9,10 @@ public class Program
 
     public static void Testa()
     {
-        Detour Datest = new Detour();
-        Datest.run();
+        //Detour Datest = new Detour();
+        //Datest.run();
+        UDP udp = new UDP();
+        udp.run();
+        
     }
 }
