@@ -1,2 +1,3 @@
 *.navmesh
 *.obj
+/obj
