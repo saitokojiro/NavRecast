@@ -234,8 +234,9 @@ public class Detour
     }
 
     //detection test
-    public void find()
+    public List<RcVec3f> find(RcVec3f start, RcVec3f end)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         var query = new DtNavMeshQuery(navData);
         var startPos = new RcVec3f(76.2f, 0.1f, 78.9f);
         var endPos = new RcVec3f(-72.3f, 0.1f, -72.7f);
@@ -244,7 +245,8 @@ public class Detour
         //Console.WriteLine($"pathfinder 1 done");
         //CNaveMesh.PathFinder(query, startPos, endPos, halfExtents);
         //permet de lancer plusieurs pathfinder, test de rapidité
-        for (int i = 0; i < 1; i++)
+
+        /*for (int i = 0; i < 1; i++)
         {
             Console.WriteLine($"pathfinder {i + 1} done");
             var path = CNaveMesh.PathFinder(query, startPos, endPos, halfExtents);
@@ -262,9 +264,10 @@ public class Detour
             {
                 Console.WriteLine($"Points détaillés : {path[0]}");
             }
-
-
-        }
+        }*/
+        sw.Stop();
+        Console.WriteLine($"[PERF] Path : {sw.ElapsedMilliseconds} ms");
+        return CNaveMesh.PathFinder(query, start, end, halfExtents);
     }
 
 
