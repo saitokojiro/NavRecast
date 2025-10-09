@@ -21,7 +21,11 @@ public class CNaveMesh
     public static RcObjImporterContext LoadObject(string path)
     {
         byte[] navData = File.ReadAllBytes(path);
-        Console.WriteLine("navData.Length: " + navData);
+        //Console.WriteLine("navData.Length: " + navData);
+        if(navData == null)
+        {
+            throw new ArgumentOutOfRangeException("Load Object is null");
+        }
         return RcObjImporter.LoadContext(navData);
     }
 
@@ -105,7 +109,7 @@ public class CNaveMesh
             );
         }
         // Vérifier que chaque vertex est complet
-        for (int i = 0; i < context.vertexPositions.Count; i += 3)
+        /*for (int i = 0; i < context.vertexPositions.Count; i += 3)
         {
             if (i + 2 >= context.vertexPositions.Count)
             {
@@ -114,7 +118,9 @@ public class CNaveMesh
                     $"{context.vertexPositions.Count - i} composants trouvés (3 requis)."
                 );
             }
-        }
+        }*/
+        if (context.vertexPositions.Count % 3 != 0)
+            throw new Exception("Nombre invalide de coordonnées...");
 
 
         var indexList = indices.ToList();
@@ -131,8 +137,8 @@ public class CNaveMesh
 
         // 5. Logs de vérification
         Console.WriteLine($"=== STATISTIQUES DU MESH ===");
-        Console.WriteLine($"Vertices : {vertices.Count} (attendu : 1 089)");
-        Console.WriteLine($"Triangles : {indices.Length / 3} (attendu : 2 048)");
+        Console.WriteLine($"[NAVMESH] Vertices : {vertices.Count} (attendu : 1 089)");
+        Console.WriteLine($"[NAVMESH] Triangles : {indices.Length / 3} (attendu : 2 048)");
         Console.WriteLine($"Premier vertex : {vertices.First()}");
         Console.WriteLine($"Dernier indice : {indices.Last()}");
 
@@ -187,7 +193,8 @@ public class CNaveMesh
         }
         //var path = new List<long>();
         var _pathcache = new List<long>();
-        var status = query.FindPath(startPolyRef, endPolyRef, startPos, endPos, filter, ref _pathcache, DtFindPathOption.AnyAngle);
+        var status = query.FindPath(startPolyRef, endPolyRef, startPos, endPos, filter, ref _pathcache, DtFindPathOption.NoOption);
+        
         if (status.Succeeded())
         {
             Console.WriteLine($"Chemin trouvé ! {_pathcache.Count} polygones dans le chemin");
@@ -198,10 +205,10 @@ public class CNaveMesh
             int straightPathCount;
             query.FindStraightPath(startPos, endPos, _pathcache, _pathcache.Count, straightPath, out straightPathCount, 256, 0);
             detailedPath.AddRange(straightPath.Take(straightPathCount).Select(p => new RcVec3f(p.pos.X, p.pos.Y, p.pos.Z)));
-            Console.WriteLine($"Points nombre : {detailedPath.Count}");
+            /*Console.WriteLine($"Points nombre : {detailedPath.Count}");
             Console.WriteLine($"Points détaillés : {detailedPath[0]}");
             Console.WriteLine($"Points détaillés : {detailedPath[1]}");
-            Console.WriteLine($"Points détaillés : {detailedPath[2]}");
+            Console.WriteLine($"Points détaillés : {detailedPath[2]}");*/
         }
         else
         {
@@ -221,6 +228,7 @@ public class CNaveMesh
         
         if(status.Succeeded())
         {
+            Console.WriteLine($"Chemin trouvé ! {_pathcache.Count} polygones dans le chemin");
             var detailedPath = new List<RcVec3f>();
             var straightPath = new DtStraightPath[256];
             int straightPathCount;
@@ -230,7 +238,7 @@ public class CNaveMesh
         }
         else
         {
-            return null;
+            return new List<RcVec3f>();
         }
     }
 
