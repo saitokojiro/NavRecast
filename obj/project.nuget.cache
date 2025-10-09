@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "TaxcW6tEMls=",
+  "dgSpecHash": "Z3hfb8konV4=",
   "success": true,
-  "projectFilePath": "D:\\CSharp\\Learn\\learn.csproj",
+  "projectFilePath": "D:\\CSharp\\pathfinder\\pathfinder.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\l231\\.nuget\\packages\\dotrecast.core\\2024.4.1\\dotrecast.core.2024.4.1.nupkg.sha512",
     "C:\\Users\\l231\\.nuget\\packages\\dotrecast.detour\\2024.4.1\\dotrecast.detour.2024.4.1.nupkg.sha512",
