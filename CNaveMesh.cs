@@ -228,7 +228,7 @@ public class CNaveMesh
         
         if(status.Succeeded())
         {
-            Console.WriteLine($"Chemin trouvé ! {_pathcache.Count} polygones dans le chemin");
+            //Console.WriteLine($"Chemin trouvé ! {_pathcache.Count} polygones dans le chemin");
             var detailedPath = new List<RcVec3f>();
             var straightPath = new DtStraightPath[256];
             int straightPathCount;
