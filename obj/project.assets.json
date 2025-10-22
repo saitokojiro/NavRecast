@@ -130,6 +130,15 @@
           "lib/net9.0/DotRecast.Recast.Toolset.dll": {}
         }
       },
+      "Google.FlatBuffers/25.2.10": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/Google.FlatBuffers.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/Google.FlatBuffers.dll": {}
+        }
+      },
       "ImGui.NET/1.90.8.1": {
         "type": "package",
         "dependencies": {
@@ -875,6 +884,23 @@
         "lib/net8.0/DotRecast.Recast.Toolset.dll",
         "lib/net9.0/DotRecast.Recast.Toolset.dll",
         "lib/netstandard2.1/DotRecast.Recast.Toolset.dll"
+      ]
+    },
+    "Google.FlatBuffers/25.2.10": {
+      "sha512": "z3ykbSRsy6oqMzeZ84a+K8rnMJ/ysVikar8r2yUhHz0HSxIjBpj53mZvpu6LjLEm5fLLWQsCdelJwL1nu7lloA==",
+      "type": "package",
+      "path": "google.flatbuffers/25.2.10",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE",
+        "flatbuffers.png",
+        "google.flatbuffers.25.2.10.nupkg.sha512",
+        "google.flatbuffers.nuspec",
+        "lib/net6.0/Google.FlatBuffers.dll",
+        "lib/net8.0/Google.FlatBuffers.dll",
+        "lib/netstandard2.0/Google.FlatBuffers.dll",
+        "lib/netstandard2.1/Google.FlatBuffers.dll"
       ]
     },
     "ImGui.NET/1.90.8.1": {
@@ -1786,7 +1812,8 @@
       "DotRecast.Detour >= 2024.4.1",
       "DotRecast.Recast >= 2024.4.1",
       "DotRecast.Recast.Demo >= 2024.4.1",
-      "DotRecast.Recast.Toolset >= 2024.4.1"
+      "DotRecast.Recast.Toolset >= 2024.4.1",
+      "Google.FlatBuffers >= 25.2.10"
     ]
   },
   "packageFolders": {
@@ -1859,6 +1886,10 @@
           "DotRecast.Recast.Toolset": {
             "target": "Package",
             "version": "[2024.4.1, )"
+          },
+          "Google.FlatBuffers": {
+            "target": "Package",
+            "version": "[25.2.10, )"
           }
         },
         "imports": [

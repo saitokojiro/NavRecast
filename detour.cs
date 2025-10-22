@@ -243,7 +243,7 @@ public class Detour
         var halfExtents = new RcVec3f(0.1f, 0.1f, 0.1f); // Extent for search area
 
         //Console.WriteLine($"pathfinder 1 done");
-        //CNaveMesh.PathFinder(query, startPos, endPos, halfExtents);
+        CNaveMesh.PathFinder(query, startPos, endPos, halfExtents);
         //permet de lancer plusieurs pathfinder, test de rapidité
 
         /*for (int i = 0; i < 1; i++)

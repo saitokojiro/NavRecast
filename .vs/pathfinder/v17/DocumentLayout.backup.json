@@ -1,12 +1,37 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "D:\\CSharp\\Learn - Copie\\",
-  "Documents": [],
+  "WorkspaceRootPath": "D:\\CSharp\\pathfinder\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{243EA969-4464-0B5E-2691-FE0852137631}|pathfinder.csproj|d:\\csharp\\pathfinder\\udp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{243EA969-4464-0B5E-2691-FE0852137631}|pathfinder.csproj|solutionrelative:udp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
       "VerticalTabListWidth": 256,
-      "DocumentGroups": []
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "UDP.cs",
+              "DocumentMoniker": "D:\\CSharp\\pathfinder\\UDP.cs",
+              "RelativeDocumentMoniker": "UDP.cs",
+              "ToolTip": "D:\\CSharp\\pathfinder\\UDP.cs",
+              "RelativeToolTip": "UDP.cs",
+              "ViewState": "AgIAAOQAAAAAAAAAAADwvw8AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-11T09:20:12.707Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

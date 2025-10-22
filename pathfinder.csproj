@@ -19,6 +19,7 @@
   <PackageReference Include="DotRecast.Recast" Version="2024.4.1" />
   <PackageReference Include="DotRecast.Recast.Demo" Version="2024.4.1" />
   <PackageReference Include="DotRecast.Recast.Toolset" Version="2024.4.1" />
+  <PackageReference Include="Google.FlatBuffers" Version="25.2.10" />
 </ItemGroup>
 
 </Project>

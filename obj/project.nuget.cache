@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "Z3hfb8konV4=",
+  "dgSpecHash": "8TjBdGO08XM=",
   "success": true,
   "projectFilePath": "D:\\CSharp\\pathfinder\\pathfinder.csproj",
   "expectedPackageFiles": [
@@ -13,6 +13,7 @@
     "C:\\Users\\l231\\.nuget\\packages\\dotrecast.recast\\2024.4.1\\dotrecast.recast.2024.4.1.nupkg.sha512",
     "C:\\Users\\l231\\.nuget\\packages\\dotrecast.recast.demo\\2024.4.1\\dotrecast.recast.demo.2024.4.1.nupkg.sha512",
     "C:\\Users\\l231\\.nuget\\packages\\dotrecast.recast.toolset\\2024.4.1\\dotrecast.recast.toolset.2024.4.1.nupkg.sha512",
+    "C:\\Users\\l231\\.nuget\\packages\\google.flatbuffers\\25.2.10\\google.flatbuffers.25.2.10.nupkg.sha512",
     "C:\\Users\\l231\\.nuget\\packages\\imgui.net\\1.90.8.1\\imgui.net.1.90.8.1.nupkg.sha512",
     "C:\\Users\\l231\\.nuget\\packages\\k4os.compression.lz4\\1.3.8\\k4os.compression.lz4.1.3.8.nupkg.sha512",
     "C:\\Users\\l231\\.nuget\\packages\\microsoft.csharp\\4.7.0\\microsoft.csharp.4.7.0.nupkg.sha512",
