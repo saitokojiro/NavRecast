@@ -1,0 +1,11 @@
+{
+  "name": "pathfinder-stress-test",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "stress": "bun run Stresscharge.ts"
+  },
+  "dependencies": {
+    "flatbuffers": "^25.2.10"
+  }
+}

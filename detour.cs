@@ -13,10 +13,13 @@ using DotRecast.Recast.Toolset.Builder;
 using DotRecast.Recast.Toolset.Geom;
 using DotRecast.Recast.Demo.UI;
 using Silk.NET.OpenGL;
+using Silk.NET.Input;
 public class Detour
 {
     public CNaveMesh CNaveMesh = new CNaveMesh();
     private DtNavMesh navData;
+
+    private  string stringPath;
     //public DtNavMesh mesh = new CNaveMesh().ImpNavMesh("./public/landO_20250305_154249.navmesh");
     public Detour()
     {
@@ -26,8 +29,7 @@ public class Detour
 
 
 
-
-    public void run()
+    public void run(string mapName = "lab2",int px = 0, int py = 0, int pz = 0)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         //  var CNaveMesh = new CNaveMesh();
@@ -57,13 +59,14 @@ public class Detour
         var recastNavbuildSet = new RcNavMeshBuildSettings();
         //recastNavbuildSet.cellSize = 0.3f;
         //recastNavbuildSet.cellSize = 0.3f;
-        recastNavbuildSet.cellSize = 0.5f;
+        recastNavbuildSet.cellSize = 0.1f;
+        //recastNavbuildSet.cellSize = 0.5f;
         //recastNavbuildSet.cellHeight = 0.2f;
         //recastNavbuildSet.cellHeight = 0.09f;
         recastNavbuildSet.cellHeight = recastNavbuildSet.cellSize * 0.5f;
         recastNavbuildSet.agentMaxSlope = 45.0f;
         recastNavbuildSet.agentHeight = 2.0f;
-        recastNavbuildSet.agentRadius = 0.6f;
+        recastNavbuildSet.agentRadius = 0.2f;
         recastNavbuildSet.agentMaxClimb = 0.9f;
         recastNavbuildSet.minRegionSize = 8;         // Valeur par défaut
         recastNavbuildSet.mergedRegionSize = 20;      // Valeur par défaut
@@ -86,11 +89,14 @@ public class Detour
         //NavMeshBuildResult result = GenerateNavMesh("./public/landO.obj", recastNavbuildSet);
 
         //NavMeshBuildResult result = new CNaveMesh().GenerateNavMesh("./public/landO.obj", recastNavbuildSet);
-        NavMeshBuildResult result = CNaveMesh.GenerateNavMesh("./public/landO.obj", recastNavbuildSet);
+        
         //var NameMesh = "landO_20250305_154249";
-        var NameMesh = "landO";
+        //var NameMesh = "lab2";
+        //var NameMesh = "maplevel2";
+        var NameMesh = mapName;
         var PathMesh = "./public/NavMesh/" + NameMesh + ".navmesh";
         var PathMeshGen = "";
+        NavMeshBuildResult result = CNaveMesh.GenerateNavMesh("./public/"+ NameMesh +".obj", recastNavbuildSet, px, py, pz);
         if (result.Success)
         { // OfFline Generate NavMesh
             var navMesh = result.NavMesh;
@@ -101,7 +107,7 @@ public class Detour
             }
 
             int polyCount = 0;
-            for (int i = 0; i < navMesh.GetTileCount(); i++)
+            for (int i = 0; i < navMesh.GetMaxTiles(); i++)
             {
                 var tile = navMesh.GetTile(i);
                 Console.WriteLine($"Tile {i}:");
@@ -112,7 +118,7 @@ public class Detour
             }
 
             Console.WriteLine($"nombre: {navMesh.IsAvailableTileCount()}");
-            Console.WriteLine($"nombre de tile: {navMesh.GetTileCount()}");
+            Console.WriteLine($"nombre de tile: {navMesh.GetMaxTiles()}");
             Console.WriteLine($"nombre de poly: {polyCount}");
 
             // Vérification des tuiles
@@ -159,6 +165,7 @@ public class Detour
             Console.WriteLine("filename :" + filename);
             var navmeshFilePath = $"./public/NavMesh/{filename}_{ymdhms}.navmesh";
             PathMeshGen = navmeshFilePath;
+            stringPath = navmeshFilePath;
             using var fs = new FileStream(navmeshFilePath, FileMode.Create, FileAccess.Write);
             using var bw = new BinaryWriter(fs);
 
@@ -176,7 +183,8 @@ public class Detour
 
         //DtNavMesh mesh = null;
         // DtNavMesh mesh = new CNaveMesh().ImpNavMesh("./public/NavMesh/testland.navmesh");
-        DtNavMesh mesh = CNaveMesh.ImpNavMesh("./public/NavMesh/landO_20250819_102554.navmesh");
+        //DtNavMesh mesh = CNaveMesh.ImpNavMesh("./public/NavMesh/landO_20250819_102554.navmesh");
+        DtNavMesh mesh = CNaveMesh.ImpNavMesh(stringPath);
         /*using (var fs = new FileStream(PathMesh, FileMode.Open, FileAccess.Read))
             {
                 using (var br = new BinaryReader(fs))
@@ -200,10 +208,10 @@ public class Detour
             Console.WriteLine("Success read NavMesh");
             //var navMesh = result.NavMesh;
             var navMesh = mesh;
-            int tileCount = navMesh.GetTileCount();
+            int tileCount = navMesh.GetMaxTiles();
             Console.WriteLine($"TtileCount: {tileCount}");
             int polyCount = 0;
-            for (int i = 0; i < navMesh.GetTileCount(); i++)
+            for (int i = 0; i < navMesh.GetMaxTiles(); i++)
             {
                 var tile = navMesh.GetTile(i);
                 Console.WriteLine($"Tile {i}:");
@@ -214,7 +222,7 @@ public class Detour
             }
 
             Console.WriteLine($"nombre: {navMesh.IsAvailableTileCount()}");
-            Console.WriteLine($"nombre de tile: {navMesh.GetTileCount()}");
+            //Console.WriteLine($"nombre de tile: {navMesh.GetTileCount()}");
             Console.WriteLine($"nombre de tile: {navMesh.GetMaxTiles()}");
             Console.WriteLine($"nombre de poly: {polyCount}");
             navData = navMesh;
@@ -230,7 +238,7 @@ public class Detour
         }
 
 
-        
+
     }
 
     //detection test
@@ -238,42 +246,63 @@ public class Detour
     {
         //var sw = System.Diagnostics.Stopwatch.StartNew();
         var query = new DtNavMeshQuery(navData);
-        var startPos = new RcVec3f(76.2f, 0.1f, 78.9f);
-        var endPos = new RcVec3f(-72.3f, 0.1f, -72.7f);
+        // var startPos = new RcVec3f(76.2f, 0.1f, 78.9f);
+        //var endPos = new RcVec3f(-72.3f, 0.1f, -72.7f);
         var halfExtents = new RcVec3f(0.1f, 0.1f, 0.1f); // Extent for search area
 
         //Console.WriteLine($"pathfinder 1 done");
-        CNaveMesh.PathFinder(query, startPos, endPos, halfExtents);
+        //CNaveMesh.PathFinder(query, startPos, endPos, halfExtents);
         //permet de lancer plusieurs pathfinder, test de rapidité
+		var check = false;
+		if(check == true)
+		{
+			for (int i = 0; i < 1; i++)
+			{
+				Console.WriteLine($"pathfinder {i + 1} done");
+				var path = CNaveMesh.PathFinder(query, start, end, halfExtents);
 
-        /*for (int i = 0; i < 1; i++)
-        {
-            Console.WriteLine($"pathfinder {i + 1} done");
-            var path = CNaveMesh.PathFinder(query, startPos, endPos, halfExtents);
+				//test des paths 
+				Console.WriteLine($"Points nombre : {path.Count}");
+				//utiliser de donner test donc a constament 14
 
-            //test des paths 
-            Console.WriteLine($"Points nombre : {path.Count}");
-            //utiliser de donner test donc a constament 14
-            if (path.Count >= 3)
-            {
-                Console.WriteLine($"Points détaillés : {path[0]}");
-                Console.WriteLine($"Points détaillés : {path[1]}");
-                Console.WriteLine($"Points détaillés : {path[2]}");
-            }
-            else
-            {
-                Console.WriteLine($"Points détaillés : {path[0]}");
-            }
-        }*/
+			// Console.WriteLine($"Points détaillés : {path[0]}");
+
+				if (path.Count >= 3)
+				{
+					Console.WriteLine($"Points détaillés : {path[0]}");
+					Console.WriteLine($"Points détaillés : {path[1]}");
+					Console.WriteLine($"Points détaillés : {path[2]}");
+				}
+				else
+				{
+					if(path[0] != null)
+					{
+						Console.WriteLine($"Points détaillés : {path[0]}");
+					}
+					
+				}
+			}
+		}
         /*sw.Stop();
         Console.WriteLine($"[PERF] Path : {sw.ElapsedMilliseconds} ms");*/
+        
         return CNaveMesh.PathFinder(query, start, end, halfExtents);
     }
 
 
 
 
+    public RcVec3f SearchValidFloor(RcVec3f start)
+    {
+        //var sw = System.Diagnostics.Stopwatch.StartNew();
+        var query = new DtNavMeshQuery(navData);
+         var startPos = new RcVec3f(-1853f /100, 700.1f/100 , 1107.0f /100);
+        //var endPos = new RcVec3f(-72.3f, 0.1f, -72.7f);
+        var halfExtents = new RcVec3f(1.5f, 5f, 1.5f); // Extent for search area
 
+        //return CNaveMesh.searchFloor(query, start,halfExtents);
+        return CNaveMesh.SearchFloorWithOffset(query, start,halfExtents);
+    }
 
 
 

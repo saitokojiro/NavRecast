@@ -1,5 +1,5 @@
 using System;
-using System.Drawing;
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using System.Numerics;
@@ -13,7 +13,6 @@ using DotRecast.Core.Numerics;
 using DotRecast.Detour;
 using Google.FlatBuffers;
 using navMesh.Sample;
-using Silk.NET.Vulkan.Video;
 
 public class Vector3DTO
 {
@@ -40,11 +39,11 @@ class UDP
     [ThreadStatic] private static FlatBufferBuilder? _threadBuilder;
     //[ThreadStatic] private static Offset<navMesh.Sample.Vec3f>[]? _threadOffsets;
     [ThreadStatic] private static Offset<Vec3f>[]? _threadOffsets;
-    
+
     //[ThreadStatic] private static ByteBuffer? _threadByteBuffer;
 
     private readonly Channel<UdpReceiveResult> _queue = Channel.CreateBounded<UdpReceiveResult>(
-        new BoundedChannelOptions(50000)
+        new BoundedChannelOptions(500000)
         {
             SingleWriter = true,
             SingleReader = false
@@ -74,7 +73,8 @@ class UDP
 
         /*udpServer.Client.ReceiveBufferSize = 2 * 1024 * 1024;
         udpServer.Client.SendBufferSize = 2 * 1024 * 1024;*/
-        for (int i = 0; i < 16; i++)
+        int workerCount = Math.Max(1, Environment.ProcessorCount);
+        for (int i = 0; i < workerCount; i++)
         {
             //_ = Task.Run(() => WorkerLoop(udpServer, map));
             _ = Task.Run(() => WorkerLoop(_socket, map));
@@ -95,17 +95,25 @@ class UDP
                 Console.BackgroundColor = ConsoleColor.Black;
             }
         });
+        var pool = ArrayPool<byte>.Shared;
+		//var buffer = new byte[65535];
+		byte[] recvBuffer = new byte[65535];
+        EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
         while (true)
         {
-            var buffer = new byte[65535];
-            EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+            //var rented = pool.Rent(65535);
+            
             try
             {
                 //_socket.ReceiveFromAsync();
                 //var result = await udpServer.ReceiveAsync();
-                SocketReceiveFromResult resultR = await _socket.ReceiveFromAsync(buffer, SocketFlags.None, new IPEndPoint(IPAddress.Any, 0));
-                int bytesReceived = resultR.ReceivedBytes;
-                var result = new UdpReceiveResult(buffer[..bytesReceived], (IPEndPoint)resultR.RemoteEndPoint);
+                //SocketReceiveFromResult resultR = await _socket.ReceiveFromAsync(rented, SocketFlags.None, new IPEndPoint(IPAddress.Any, 0));
+                SocketReceiveFromResult resultR = await _socket.ReceiveFromAsync(recvBuffer, SocketFlags.None, new IPEndPoint(IPAddress.Any, 0));
+                var arr = new byte[resultR.ReceivedBytes];
+				//Array.Copy(rented, arr, bytesReceived);
+				Array.Copy(recvBuffer, arr, resultR.ReceivedBytes);
+                //var result = new UdpReceiveResult(buffer[..bytesReceived], (IPEndPoint)resultR.RemoteEndPoint);
+                var result = new UdpReceiveResult(arr, (IPEndPoint)resultR.RemoteEndPoint);
 
                 if (!_queue.Writer.TryWrite(result))
                 {
@@ -117,7 +125,7 @@ class UDP
             catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionReset)
             {
                 // UDP client distant fermé brutalement → on ignore
-                Console.WriteLine("⚠️ Client UDP a fermé brutalement (10054) — ignoré");
+                //Console.WriteLine("⚠️ Client UDP a fermé brutalement");
                 continue;
             }
             catch (Exception ex)
@@ -159,18 +167,19 @@ class UDP
     //private async Task WorkerLoop(UdpClient client, Detour map)
     private async Task WorkerLoop(Socket client, Detour map)
     {
-        var builder = _threadBuilder ??= new FlatBufferBuilder(2048);
-        int loopcounter = 0;
+        //var builder = _threadBuilder ??= new FlatBufferBuilder(2048);
+        var builder = new FlatBufferBuilder(2048);
+        int loopCounter = 0;
         const int yieldEvery = 64;
         //var offsets = _threadOffsets ??= new List<Offset<Vec3f>>(256);
         //var bb = _threadByteBuffer ??= new ByteBuffer(new byte[65535]); // buffer max UDP
-        
+
         await foreach (var packet in _queue.Reader.ReadAllAsync())
         {
             try
             {
 
-                handelPacket(packet, client, map, builder);
+                await handelPacket(packet, client, map, builder);
                 //Console.WriteLine($"check worker: {a}");
                 Interlocked.Increment(ref _packetsProcessed);
 
@@ -181,6 +190,13 @@ class UDP
 
                 Console.WriteLine($"Erreur: {ex.Message}");
 
+            }
+            loopCounter++;
+            if ((loopCounter & (yieldEvery - 1)) == 0) // si yieldEvery est puissance de 2
+            {
+                await Task.Yield(); // laisse respirer le scheduler
+                                    // ou, si tu préfères bloquer très brièvement :
+                                    // Thread.Sleep(0);
             }
         }
     }
@@ -193,100 +209,253 @@ class UDP
         byte[] receivedBytes = result.Buffer;
         //ByteBuffer bb = new ByteBuffer(receivedBytes);
 
-        builder.Clear();
+
         //pointsOffsets.Clear();
         var bb = new ByteBuffer(receivedBytes);
         //bb.Reset(result.Buffer);
         NavMesh ftnavMesh = NavMesh.GetRootAsNavMesh(bb);
-
-        RcVec3f start = new RcVec3f(ftnavMesh.Start.Value.X, ftnavMesh.Start.Value.Y, ftnavMesh.Start.Value.Z);
-        RcVec3f end = new RcVec3f(ftnavMesh.End.Value.X, ftnavMesh.End.Value.Y, ftnavMesh.End.Value.Z);
-
-        List<RcVec3f> path = map.find(start, end);
-
-
-
-        //Console.WriteLine($"2");
-        //var pointsOffsets = new Offset<navMesh.Sample.Vec3f>[path.Count];
-        if (_threadOffsets == null || _threadOffsets.Length < path.Count)
-            _threadOffsets = new Offset<Vec3f>[Math.Max(256, path.Count)];
-        for (int i = 0; i < path.Count; i++)
+        if (ftnavMesh.Type == "spawn")
         {
-
-            var p = path[i];
-            _threadOffsets[i] = navMesh.Sample.Vec3f.CreateVec3f(builder, p.X, p.Y, p.Z);
-        }
-
-
-        var pointsVector = navMesh.Sample.NavMesh.CreatePointsVector(builder, _threadOffsets.AsSpan(0, path.Count).ToArray());
-        var startV = navMesh.Sample.Vec3f.CreateVec3f(builder, ftnavMesh.Start.Value.X, ftnavMesh.Start.Value.Y, ftnavMesh.Start.Value.Z);
-        var endV = navMesh.Sample.Vec3f.CreateVec3f(builder, ftnavMesh.End.Value.X, ftnavMesh.End.Value.Y, ftnavMesh.End.Value.Z);
-        var typeString = builder.CreateString("navmesh");
-
-        //Console.WriteLine($"3");
-        navMesh.Sample.NavMesh.StartNavMesh(builder);
-        navMesh.Sample.NavMesh.AddType(builder, typeString);
-        navMesh.Sample.NavMesh.AddStart(builder, startV);
-        navMesh.Sample.NavMesh.AddEnd(builder, endV);
-        navMesh.Sample.NavMesh.AddPoints(builder, pointsVector);
-        var navmeshoff = navMesh.Sample.NavMesh.EndNavMesh(builder);
-        builder.Finish(navmeshoff.Value);
-        byte[] buff = builder.SizedByteArray();
-        //Console.WriteLine($"4");
-        //byte[] buff = Encoding.UTF8.GetBytes("message recu");
-        //lock (sendLock)
-        //{
-        //udpClient.SendAsync(buff, buff.Length, result.RemoteEndPoint);
-        //IPEndPoint destinationEP = new IPEndPoint(IPAddress.Parse("192.168.1.61"), 3302);
-        //udpClient.SendAsync(buff, SocketFlags.None, destinationEP);
-        //Console.WriteLine($"addr = {result.RemoteEndPoint.Port}");
-        //_ = udpClient.SendToAsync(buff, SocketFlags.None, result.RemoteEndPoint);
-        //}
-        await SendBufferedAsync(udpClient, buff, result.RemoteEndPoint);
-
-    }
-    
-    private async Task SendBufferedAsync(Socket udpClient, byte[] buffer, EndPoint destination)
-{
-    await _sendSemaphore.WaitAsync();
-    try
-    {
-        // SendToAsync renvoie un ValueTask/Task selon la signature ; on attend pour gérer erreurs
-        await udpClient.SendToAsync(buffer, SocketFlags.None, destination);
-    }
-    catch (SocketException sx)
-    {
-        Console.WriteLine($"Socket send error: {sx.SocketErrorCode}");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Send error: {ex.Message}");
-    }
-    finally
-    {
-        _sendSemaphore.Release();
-    }
-}
-
-
-    private byte[] SerializeVectorList(List<RcVec3f> vectors)
-    {
-        using (MemoryStream ms = new MemoryStream())
-        using (BinaryWriter writer = new BinaryWriter(ms))
-        {
-            // Écriture du nombre de vecteurs
-            writer.Write(vectors.Count);
-
-            // Écriture des données de chaque vecteur
-            foreach (var vec in vectors)
+            RcVec3f start = new RcVec3f(ftnavMesh.Start.Value.X, ftnavMesh.Start.Value.Y, ftnavMesh.Start.Value.Z);
+            RcVec3f endPos = new RcVec3f(ftnavMesh.End.Value.X, ftnavMesh.End.Value.Y, ftnavMesh.End.Value.Z);
+            builder.Clear();
+            try
             {
-                writer.Write(vec.X);
-                writer.Write(vec.Y);
-                writer.Write(vec.Z);
+                Console.WriteLine($"x : {start.X} y: {start.Y} z: {start.Z} ");
+                RcVec3f spawn = map.SearchValidFloor(start);
+                Console.WriteLine($"x : {endPos.X} y: {endPos.Y} z: {endPos.Z} ");
+                RcVec3f targetPosition = map.SearchValidFloor(endPos);
+                RcVec3f empty = new RcVec3f();
+
+
+                var pointsVector = navMesh.Sample.NavMesh.CreatePointsVector(builder, _threadOffsets.AsSpan(0, 0).ToArray());
+                var startV = navMesh.Sample.Vec3f.CreateVec3f(builder, spawn.X, spawn.Y, spawn.Z);
+                var endV = navMesh.Sample.Vec3f.CreateVec3f(builder, targetPosition.X, targetPosition.Y, targetPosition.Z);
+                var typeString = builder.CreateString("spawn");
+                var zoneString = builder.CreateString(ftnavMesh.Zone);
+                var uuidString = builder.CreateString(ftnavMesh.Uuid);
+                Console.WriteLine(ftnavMesh.Zone);
+                Console.WriteLine(ftnavMesh.Uuid);
+                Console.WriteLine("X : "+spawn.X + " Y : " + spawn.Y + " Z : " + spawn.Z);
+                
+                if (spawn == empty)
+                {
+                    typeString = builder.CreateString("spawnErr");
+                }
+
+                //Console.WriteLine($"3");
+                navMesh.Sample.NavMesh.StartNavMesh(builder);
+                navMesh.Sample.NavMesh.AddType(builder, typeString);
+                navMesh.Sample.NavMesh.AddZone(builder, zoneString);
+                navMesh.Sample.NavMesh.AddUuid(builder, uuidString);
+                navMesh.Sample.NavMesh.AddStart(builder, startV);
+                navMesh.Sample.NavMesh.AddEnd(builder, endV);
+                navMesh.Sample.NavMesh.AddPoints(builder, pointsVector);
+                var navmeshoff = navMesh.Sample.NavMesh.EndNavMesh(builder);
+                builder.Finish(navmeshoff.Value);
+                byte[] buff = builder.SizedByteArray();
+                await SendBufferedAsync(udpClient, buff, result.RemoteEndPoint);
             }
-            return ms.ToArray();
+            catch (System.Exception ex)
+            {
+
+                Console.WriteLine($"⚠️ probleme : {ex}");
+            }
+        }
+        if (ftnavMesh.Type == "moveNPC")
+        {
+            RcVec3f start = new RcVec3f(ftnavMesh.Start.Value.X, ftnavMesh.Start.Value.Y, ftnavMesh.Start.Value.Z);
+            RcVec3f endPos = new RcVec3f(ftnavMesh.End.Value.X, ftnavMesh.End.Value.Y, ftnavMesh.End.Value.Z);
+            builder.Clear();
+            try
+            {
+                Console.WriteLine($"x : {start.X} y: {start.Y} z: {start.Z} ");
+                RcVec3f spawn = map.SearchValidFloor(start);
+                Console.WriteLine($"x : {endPos.X} y: {endPos.Y} z: {endPos.Z} ");
+                RcVec3f targetPosition = map.SearchValidFloor(endPos);
+                RcVec3f empty = new RcVec3f();
+                List<RcVec3f> path;
+
+
+
+                if (spawn != empty && targetPosition != empty)
+                {
+                    //gestion du path 
+                    try
+                    {
+                        path = map.find(spawn, targetPosition) ?? new List<RcVec3f>();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.ToString());
+                        path = new List<RcVec3f>();
+                    }
+
+                }
+                else
+                {
+                    path = new List<RcVec3f>();
+                }
+
+                if (_threadOffsets == null || _threadOffsets.Length < path.Count)
+                    _threadOffsets = new Offset<Vec3f>[Math.Max(64, path.Count)];
+                for (int i = 0; i < path.Count; i++)
+                {
+
+                    var p = path[i];
+                    _threadOffsets[i] = navMesh.Sample.Vec3f.CreateVec3f(builder, p.X, p.Y, p.Z);
+                }
+
+                
+
+
+                var pointsVector = navMesh.Sample.NavMesh.CreatePointsVector(builder, _threadOffsets.AsSpan(0, path.Count).ToArray());
+                var startV = navMesh.Sample.Vec3f.CreateVec3f(builder, spawn.X, spawn.Y, spawn.Z);
+                //var endV = navMesh.Sample.Vec3f.CreateVec3f(builder, targetPosition.X, targetPosition.Y, targetPosition.Z);
+                var endV = navMesh.Sample.Vec3f.CreateVec3f(builder, targetPosition.X, targetPosition.Y, targetPosition.Z);
+                var typeString = builder.CreateString("moveNPC");
+                var zoneString = builder.CreateString(ftnavMesh.Zone);
+                var uuidString = builder.CreateString(ftnavMesh.Uuid);
+
+                if (spawn == empty)
+                {
+                    typeString = builder.CreateString("moveNPCErr");
+                }
+
+                //Console.WriteLine($"3");
+                navMesh.Sample.NavMesh.StartNavMesh(builder);
+                navMesh.Sample.NavMesh.AddType(builder, typeString);
+                navMesh.Sample.NavMesh.AddZone(builder, zoneString);
+                navMesh.Sample.NavMesh.AddUuid(builder, uuidString);
+                navMesh.Sample.NavMesh.AddStart(builder, startV);
+                navMesh.Sample.NavMesh.AddEnd(builder, endV);
+                navMesh.Sample.NavMesh.AddPoints(builder, pointsVector);
+                var navmeshoff = navMesh.Sample.NavMesh.EndNavMesh(builder);
+                builder.Finish(navmeshoff.Value);
+                byte[] buff = builder.SizedByteArray();
+                await SendBufferedAsync(udpClient, buff, result.RemoteEndPoint);
+            }
+            catch (System.Exception ex)
+            {
+
+                Console.WriteLine($"⚠️ probleme : {ex}");
+            }
+        }
+        if (ftnavMesh.Type == "navmesh")
+        {
+
+
+            Console.WriteLine($"Start X:  {ftnavMesh.Start.Value.X}, Y: {ftnavMesh.Start.Value.Y}, Z: {ftnavMesh.Start.Value.Z}");
+            Console.WriteLine($"End X:  {ftnavMesh.End.Value.X}, Y: {ftnavMesh.End.Value.Y}, Z: {ftnavMesh.End.Value.Z}");
+
+            RcVec3f start = new RcVec3f(ftnavMesh.Start.Value.X, ftnavMesh.Start.Value.Y, ftnavMesh.Start.Value.Z);
+            RcVec3f end = new RcVec3f(ftnavMesh.End.Value.X, ftnavMesh.End.Value.Y, ftnavMesh.End.Value.Z);
+
+            try
+            {
+
+                /*const int pathfindingTimeoutMs = 50;
+                var findTask = Task.Run(() => map.find(start, end));
+                var completed = await Task.WhenAny(findTask, Task.Delay(pathfindingTimeoutMs));
+                //List<RcVec3f> path = map.find(start, end);
+                List<RcVec3f> path;
+                if (completed == findTask)
+                {
+                    path = findTask.Result ?? new List<RcVec3f>();
+                }
+                else
+                {
+                    path = new List<RcVec3f>();
+
+                }*/
+                List<RcVec3f> path;
+                try
+                {
+                    path = map.find(start, end) ?? new List<RcVec3f>();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                    path = new List<RcVec3f>();
+                }
+
+                builder.Clear();
+
+                //Console.WriteLine($"2");
+                //var pointsOffsets = new Offset<navMesh.Sample.Vec3f>[path.Count];
+                if (_threadOffsets == null || _threadOffsets.Length < path.Count)
+                    _threadOffsets = new Offset<Vec3f>[Math.Max(64, path.Count)];
+                for (int i = 0; i < path.Count; i++)
+                {
+
+                    var p = path[i];
+                    _threadOffsets[i] = navMesh.Sample.Vec3f.CreateVec3f(builder, p.X, p.Y, p.Z);
+                }
+
+
+                var pointsVector = navMesh.Sample.NavMesh.CreatePointsVector(builder, _threadOffsets.AsSpan(0, path.Count).ToArray());
+                var startV = navMesh.Sample.Vec3f.CreateVec3f(builder, ftnavMesh.Start.Value.X, ftnavMesh.Start.Value.Y, ftnavMesh.Start.Value.Z);
+                var endV = navMesh.Sample.Vec3f.CreateVec3f(builder, ftnavMesh.End.Value.X, ftnavMesh.End.Value.Y, ftnavMesh.End.Value.Z);
+                var typeString = builder.CreateString("navmesh");
+                var zoneString = builder.CreateString(ftnavMesh.Zone);
+                var uuidString = builder.CreateString(ftnavMesh.Uuid);
+
+                //Console.WriteLine($"3");
+                navMesh.Sample.NavMesh.StartNavMesh(builder);
+                navMesh.Sample.NavMesh.AddType(builder, typeString);
+                navMesh.Sample.NavMesh.AddZone(builder, zoneString);
+                navMesh.Sample.NavMesh.AddUuid(builder, uuidString);
+                navMesh.Sample.NavMesh.AddStart(builder, startV);
+                navMesh.Sample.NavMesh.AddEnd(builder, endV);
+                navMesh.Sample.NavMesh.AddPoints(builder, pointsVector);
+                var navmeshoff = navMesh.Sample.NavMesh.EndNavMesh(builder);
+                builder.Finish(navmeshoff.Value);
+                byte[] buff = builder.SizedByteArray();
+                //Console.WriteLine($"4");
+                //byte[] buff = Encoding.UTF8.GetBytes("message recu");
+                //lock (sendLock)
+                //{
+                //udpClient.SendAsync(buff, buff.Length, result.RemoteEndPoint);
+                //IPEndPoint destinationEP = new IPEndPoint(IPAddress.Parse("192.168.1.61"), 3302);
+                //udpClient.SendAsync(buff, SocketFlags.None, destinationEP);
+                //Console.WriteLine($"addr = {result.RemoteEndPoint.Port}");
+                //_ = udpClient.SendToAsync(buff, SocketFlags.None, result.RemoteEndPoint);
+                //}
+                await SendBufferedAsync(udpClient, buff, result.RemoteEndPoint);
+
+            }
+            catch (System.Exception ex)
+            {
+                Console.WriteLine($"⚠️ probleme : {ex}");
+            }
+
+
         }
     }
+
+    private async Task SendBufferedAsync(Socket udpClient, byte[] buffer, EndPoint destination)
+    {
+        await _sendSemaphore.WaitAsync();
+        try
+        {
+            // SendToAsync renvoie un ValueTask/Task selon la signature ; on attend pour gérer erreurs
+            await udpClient.SendToAsync(buffer, SocketFlags.None, destination);
+        }
+        catch (SocketException sx)
+        {
+            Console.WriteLine($"Socket send error: {sx.SocketErrorCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Send error: {ex.Message}");
+        }
+        finally
+        {
+            _sendSemaphore.Release();
+        }
+    }
+
+
 }
 
 

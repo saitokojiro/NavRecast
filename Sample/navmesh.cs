@@ -27,29 +27,49 @@ public struct NavMesh : IFlatbufferObject
   public ArraySegment<byte>? GetTypeBytes() { return __p.__vector_as_arraysegment(4); }
 #endif
   public byte[] GetTypeArray() { return __p.__vector_as_array<byte>(4); }
-  public navMesh.Sample.Vec3f? Start { get { int o = __p.__offset(6); return o != 0 ? (navMesh.Sample.Vec3f?)(new navMesh.Sample.Vec3f()).__assign(__p.__indirect(o + __p.bb_pos), __p.bb) : null; } }
-  public navMesh.Sample.Vec3f? End { get { int o = __p.__offset(8); return o != 0 ? (navMesh.Sample.Vec3f?)(new navMesh.Sample.Vec3f()).__assign(__p.__indirect(o + __p.bb_pos), __p.bb) : null; } }
-  public navMesh.Sample.Vec3f? Points(int j) { int o = __p.__offset(10); return o != 0 ? (navMesh.Sample.Vec3f?)(new navMesh.Sample.Vec3f()).__assign(__p.__indirect(__p.__vector(o) + j * 4), __p.bb) : null; }
-  public int PointsLength { get { int o = __p.__offset(10); return o != 0 ? __p.__vector_len(o) : 0; } }
+  public string Zone { get { int o = __p.__offset(6); return o != 0 ? __p.__string(o + __p.bb_pos) : null; } }
+#if ENABLE_SPAN_T
+  public Span<byte> GetZoneBytes() { return __p.__vector_as_span<byte>(6, 1); }
+#else
+  public ArraySegment<byte>? GetZoneBytes() { return __p.__vector_as_arraysegment(6); }
+#endif
+  public byte[] GetZoneArray() { return __p.__vector_as_array<byte>(6); }
+  public string Uuid { get { int o = __p.__offset(8); return o != 0 ? __p.__string(o + __p.bb_pos) : null; } }
+#if ENABLE_SPAN_T
+  public Span<byte> GetUuidBytes() { return __p.__vector_as_span<byte>(8, 1); }
+#else
+  public ArraySegment<byte>? GetUuidBytes() { return __p.__vector_as_arraysegment(8); }
+#endif
+  public byte[] GetUuidArray() { return __p.__vector_as_array<byte>(8); }
+  public navMesh.Sample.Vec3f? Start { get { int o = __p.__offset(10); return o != 0 ? (navMesh.Sample.Vec3f?)(new navMesh.Sample.Vec3f()).__assign(__p.__indirect(o + __p.bb_pos), __p.bb) : null; } }
+  public navMesh.Sample.Vec3f? End { get { int o = __p.__offset(12); return o != 0 ? (navMesh.Sample.Vec3f?)(new navMesh.Sample.Vec3f()).__assign(__p.__indirect(o + __p.bb_pos), __p.bb) : null; } }
+  public navMesh.Sample.Vec3f? Points(int j) { int o = __p.__offset(14); return o != 0 ? (navMesh.Sample.Vec3f?)(new navMesh.Sample.Vec3f()).__assign(__p.__indirect(__p.__vector(o) + j * 4), __p.bb) : null; }
+  public int PointsLength { get { int o = __p.__offset(14); return o != 0 ? __p.__vector_len(o) : 0; } }
 
   public static Offset<navMesh.Sample.NavMesh> CreateNavMesh(FlatBufferBuilder builder,
       StringOffset typeOffset = default(StringOffset),
+      StringOffset zoneOffset = default(StringOffset),
+      StringOffset uuidOffset = default(StringOffset),
       Offset<navMesh.Sample.Vec3f> startOffset = default(Offset<navMesh.Sample.Vec3f>),
       Offset<navMesh.Sample.Vec3f> endOffset = default(Offset<navMesh.Sample.Vec3f>),
       VectorOffset pointsOffset = default(VectorOffset)) {
-    builder.StartTable(4);
+    builder.StartTable(6);
     NavMesh.AddPoints(builder, pointsOffset);
     NavMesh.AddEnd(builder, endOffset);
     NavMesh.AddStart(builder, startOffset);
+    NavMesh.AddUuid(builder, uuidOffset);
+    NavMesh.AddZone(builder, zoneOffset);
     NavMesh.AddType(builder, typeOffset);
     return NavMesh.EndNavMesh(builder);
   }
 
-  public static void StartNavMesh(FlatBufferBuilder builder) { builder.StartTable(4); }
+  public static void StartNavMesh(FlatBufferBuilder builder) { builder.StartTable(6); }
   public static void AddType(FlatBufferBuilder builder, StringOffset typeOffset) { builder.AddOffset(0, typeOffset.Value, 0); }
-  public static void AddStart(FlatBufferBuilder builder, Offset<navMesh.Sample.Vec3f> startOffset) { builder.AddOffset(1, startOffset.Value, 0); }
-  public static void AddEnd(FlatBufferBuilder builder, Offset<navMesh.Sample.Vec3f> endOffset) { builder.AddOffset(2, endOffset.Value, 0); }
-  public static void AddPoints(FlatBufferBuilder builder, VectorOffset pointsOffset) { builder.AddOffset(3, pointsOffset.Value, 0); }
+  public static void AddZone(FlatBufferBuilder builder, StringOffset zoneOffset) { builder.AddOffset(1, zoneOffset.Value, 0); }
+  public static void AddUuid(FlatBufferBuilder builder, StringOffset uuidOffset) { builder.AddOffset(2, uuidOffset.Value, 0); }
+  public static void AddStart(FlatBufferBuilder builder, Offset<navMesh.Sample.Vec3f> startOffset) { builder.AddOffset(3, startOffset.Value, 0); }
+  public static void AddEnd(FlatBufferBuilder builder, Offset<navMesh.Sample.Vec3f> endOffset) { builder.AddOffset(4, endOffset.Value, 0); }
+  public static void AddPoints(FlatBufferBuilder builder, VectorOffset pointsOffset) { builder.AddOffset(5, pointsOffset.Value, 0); }
   public static VectorOffset CreatePointsVector(FlatBufferBuilder builder, Offset<navMesh.Sample.Vec3f>[] data) { builder.StartVector(4, data.Length, 4); for (int i = data.Length - 1; i >= 0; i--) builder.AddOffset(data[i].Value); return builder.EndVector(); }
   public static VectorOffset CreatePointsVectorBlock(FlatBufferBuilder builder, Offset<navMesh.Sample.Vec3f>[] data) { builder.StartVector(4, data.Length, 4); builder.Add(data); return builder.EndVector(); }
   public static VectorOffset CreatePointsVectorBlock(FlatBufferBuilder builder, ArraySegment<Offset<navMesh.Sample.Vec3f>> data) { builder.StartVector(4, data.Count, 4); builder.Add(data); return builder.EndVector(); }
@@ -70,9 +90,11 @@ static public class NavMeshVerify
   {
     return verifier.VerifyTableStart(tablePos)
       && verifier.VerifyString(tablePos, 4 /*Type*/, false)
-      && verifier.VerifyTable(tablePos, 6 /*Start*/, navMesh.Sample.Vec3fVerify.Verify, false)
-      && verifier.VerifyTable(tablePos, 8 /*End*/, navMesh.Sample.Vec3fVerify.Verify, false)
-      && verifier.VerifyVectorOfTables(tablePos, 10 /*Points*/, navMesh.Sample.Vec3fVerify.Verify, false)
+      && verifier.VerifyString(tablePos, 6 /*Zone*/, false)
+      && verifier.VerifyString(tablePos, 8 /*Uuid*/, false)
+      && verifier.VerifyTable(tablePos, 10 /*Start*/, navMesh.Sample.Vec3fVerify.Verify, false)
+      && verifier.VerifyTable(tablePos, 12 /*End*/, navMesh.Sample.Vec3fVerify.Verify, false)
+      && verifier.VerifyVectorOfTables(tablePos, 14 /*Points*/, navMesh.Sample.Vec3fVerify.Verify, false)
       && verifier.VerifyTableEnd(tablePos);
   }
 }

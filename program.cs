@@ -10,9 +10,16 @@ public class Program
 
     public static async Task Testa()
     {
+        List<Detour> Maps =  new List<Detour>();
         Detour Datest = new Detour();
-        Datest.run();
+        // Y = hauteur
+        Datest.run("maplevel2",0,0,0);
+     
+       
         //Datest.find();
+
+        //Datest.findTest();
+
         UDP udp = new UDP();
         await udp.run(Datest);
         

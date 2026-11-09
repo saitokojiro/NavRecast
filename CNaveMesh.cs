@@ -22,7 +22,7 @@ public class CNaveMesh
     {
         byte[] navData = File.ReadAllBytes(path);
         //Console.WriteLine("navData.Length: " + navData);
-        if(navData == null)
+        if (navData == null)
         {
             throw new ArgumentOutOfRangeException("Load Object is null");
         }
@@ -58,7 +58,7 @@ public class CNaveMesh
         }
     }
 
-    public NavMeshBuildResult GenerateNavMesh(string pathObj, RcNavMeshBuildSettings config)
+    public NavMeshBuildResult GenerateNavMesh(string pathObj, RcNavMeshBuildSettings config, int px = 0, int py = 0, int pz = 0)
     {
 
         //var context = LoadObject("./bin/debug/net9.0/map.obj");
@@ -74,7 +74,13 @@ public class CNaveMesh
             vertices.Add(new RcVec3f(x, y, z));
         }
 
+        RcVec3f offset = new RcVec3f(px, py, pz);
+        for (int i = 0; i < vertices.Count; i++)
+        {
+            vertices[i] = RcVec3f.Add(vertices[i], offset);
+        }
 
+        vertexFloats.Clear();
         foreach (var v in vertices)
         {
             vertexFloats.Add(v.X);
@@ -84,6 +90,9 @@ public class CNaveMesh
         /* var indices = context.meshFaces
              .Select(i => (int)i <= 0 ? throw new Exception($"Indice invalide : {i}") : (int)i - 1)
              .ToArray();*/
+
+
+
         var indices = context.meshFaces
         .Select(i => i)
         .ToArray();
@@ -119,6 +128,9 @@ public class CNaveMesh
                 );
             }
         }*/
+
+
+
         if (context.vertexPositions.Count % 3 != 0)
             throw new Exception("Nombre invalide de coordonnées...");
 
@@ -164,8 +176,71 @@ public class CNaveMesh
 
             throw new Exception("Échec de la génération du NavMesh");
         }
+        else
+        {
+            Console.WriteLine($"Dernier indice");
+        }
 
         return result;
+    }
+
+    public RcVec3f searchFloor(DtNavMeshQuery query, RcVec3f startPos, RcVec3f halfExtents)
+    {
+        var filter = new DtQueryDefaultFilter();
+
+        var startPolyResult = query.FindNearestPoly(startPos, halfExtents, filter, out var startPolyRef, out var nearest, out _);
+        if (!startPolyResult.Succeeded() || startPolyRef == 0)
+        {
+            Console.WriteLine($"Failed to find start position reference: {startPolyResult}");
+            return new RcVec3f();
+
+        }
+        else
+        {
+            if (!query.GetPolyHeight(startPolyRef, startPos, out float y).Succeeded())
+            {
+                Console.WriteLine("Failed to get poly height.");
+            }
+            Console.WriteLine($"find start position reference: {startPolyResult}");
+
+            RcVec3f finalPos = new RcVec3f(nearest.X, y, nearest.Z);
+
+            return finalPos;
+
+        }
+    }
+    public RcVec3f SearchFloorWithOffset(DtNavMeshQuery query, RcVec3f startPos, RcVec3f halfExtents, float maxRadius =1.0f, float step = 0.5f)
+    {
+        var filter = new DtQueryDefaultFilter();
+
+        // On essaye d'abord la position de départ
+        var startPolyResult = query.FindNearestPoly(startPos, halfExtents, filter, out var startPolyRef, out var nearest, out _);
+        if (startPolyResult.Succeeded() && startPolyRef != 0)
+        {
+            query.GetPolyHeight(startPolyRef, startPos, out float y);
+            return new RcVec3f(nearest.X, nearest.Y, nearest.Z);
+        }
+
+        // Si la position de départ n'est pas valide, on commence à "prober" autour
+        for (float radius = step; radius <= maxRadius; radius += step)
+        {
+            for (float dx = -radius; dx <= radius; dx += step)
+            {
+                for (float dz = -radius; dz <= radius; dz += step)
+                {
+                    var testPos = new RcVec3f(startPos.X + dx, startPos.Y, startPos.Z + dz);
+                    startPolyResult = query.FindNearestPoly(testPos, halfExtents, filter, out startPolyRef, out nearest, out _);
+                    if (startPolyResult.Succeeded() && startPolyRef != 0)
+                    {
+                        query.GetPolyHeight(startPolyRef, testPos, out float y);
+                        return new RcVec3f(nearest.X, y, nearest.Z);
+                    }
+                }
+            }
+        }
+
+        Console.WriteLine("Failed to find any valid floor near start position.");
+        return new RcVec3f();
     }
 
 
@@ -192,18 +267,24 @@ public class CNaveMesh
 
         }
         //var path = new List<long>();
-        var _pathcache = new List<long>();
-        var status = query.FindPath(startPolyRef, endPolyRef, startPos, endPos, filter, ref _pathcache, DtFindPathOption.NoOption);
-        
+        //var _pathcache = new List<long>();
+        Span<long> path = stackalloc long[256];
+        int maxPath = path.Length;
+        //var status = query.FindPath(startPolyRef, endPolyRef, startPos, endPos, filter, ref _pathcache, DtFindPathOption.NoOption);
+        var status = query.FindPath(startPolyRef, endPolyRef, startPos, endPos, filter, path, out var pathCount, maxPath);
+
+
         if (status.Succeeded())
         {
-            Console.WriteLine($"Chemin trouvé ! {_pathcache.Count} polygones dans le chemin");
+            //Console.WriteLine($"Chemin trouvé ! {_pathcache.Count} polygones dans le chemin");
+            Console.WriteLine($"Chemin trouvé ! {pathCount} polygones dans le chemin");
 
             // Optionnel : Convertir les références en positions
             var detailedPath = new List<RcVec3f>();
             var straightPath = new DtStraightPath[256];
             int straightPathCount;
-            query.FindStraightPath(startPos, endPos, _pathcache, _pathcache.Count, straightPath, out straightPathCount, 256, 0);
+            //query.FindStraightPath(startPos, endPos, _pathcache, _pathcache.Count, straightPath, out straightPathCount, 256, 0);
+            query.FindStraightPath(startPos, endPos, path, pathCount, straightPath, out straightPathCount, 256, 0);
             detailedPath.AddRange(straightPath.Take(straightPathCount).Select(p => new RcVec3f(p.pos.X, p.pos.Y, p.pos.Z)));
             /*Console.WriteLine($"Points nombre : {detailedPath.Count}");
             Console.WriteLine($"Points détaillés : {detailedPath[0]}");
@@ -213,7 +294,8 @@ public class CNaveMesh
         else
         {
             Console.WriteLine($"Chemin pas trouvé ! ");
-            Console.WriteLine($"{_pathcache.Count}");
+            //Console.WriteLine($"{_pathcache.Count}");
+            Console.WriteLine($"{pathCount}");
         }
 
     }
@@ -224,20 +306,28 @@ public class CNaveMesh
         var startPolyResult = query.FindNearestPoly(startPos, halfExtents, filter, out var startPolyRef, out _, out _);
         var endPolyResult = query.FindNearestPoly(endPos, halfExtents, filter, out var endPolyRef, out _, out _);
         var _pathcache = new List<long>();
-        var status = query.FindPath(startPolyRef, endPolyRef, startPos, endPos, filter, ref _pathcache, DtFindPathOption.AnyAngle);
-        
-        if(status.Succeeded())
+        Span<long> path = stackalloc long[256];
+        int maxCount = path.Length;
+        //var status = query.FindPath(startPolyRef, endPolyRef, startPos, endPos, filter, ref _pathcache, DtFindPathOption.AnyAngle);
+        var status = query.FindPath(startPolyRef, endPolyRef, startPos, endPos, filter, path, out var pathCount, maxCount);
+
+        if (status.Succeeded())
         {
             //Console.WriteLine($"Chemin trouvé ! {_pathcache.Count} polygones dans le chemin");
+            Console.WriteLine($"Chemin trouvé ! {pathCount} polygones dans le chemin");
             var detailedPath = new List<RcVec3f>();
             var straightPath = new DtStraightPath[256];
             int straightPathCount;
-            query.FindStraightPath(startPos, endPos, _pathcache, _pathcache.Count, straightPath, out straightPathCount, 256, 0);
+            //query.FindStraightPath(startPos, endPos, _pathcache, _pathcache.Count, straightPath, out straightPathCount, 256, 0);
+            query.FindStraightPath(startPos, endPos, path, pathCount, straightPath, out straightPathCount, 256, 0);
             detailedPath.AddRange(straightPath.Take(straightPathCount).Select(p => new RcVec3f(p.pos.X, p.pos.Y, p.pos.Z)));
             return detailedPath;
         }
         else
         {
+            //Console.WriteLine($"Chemin not find ! {_pathcache.Count}");
+            Console.WriteLine($"Chemin not find ! {pathCount}");
+            Console.WriteLine($"path {startPos}");
             return new List<RcVec3f>();
         }
     }
